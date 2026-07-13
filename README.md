@@ -115,8 +115,15 @@ Installing wifikit pulls its **Python** dependencies automatically (including
 
 The **cracking** half of the workflow shells out to native CLI tools that pip
 **cannot** install — grab them from your OS package manager. They're optional:
-everything except cracking works without them. Run `wifikit --doctor` any time to
-see what's present and how to install the rest.
+everything except cracking works without them.
+
+```bash
+wifikit --setup     # auto-install the missing tools (brew/apt/dnf/pacman)
+wifikit --doctor    # just report what's present + how to install the rest
+```
+
+`--setup` detects your package manager, shows the exact command, and installs the
+missing tools; the underlying commands are:
 
 | Tool | Needed for | macOS | Debian/Ubuntu |
 | :-- | :-- | :-- | :-- |
@@ -153,6 +160,7 @@ wifikit --list-ports          # show candidate serial ports
 wifikit --demo                # try the TUI with sample data (no board needed)
 wifikit --benchmark           # measure this GPU's WPA crack rate + time table
 wifikit --doctor              # check external tools (hashcat, hcxtools) + hints
+wifikit --setup               # auto-install missing external tools (--yes to skip prompt)
 ```
 
 `--capture` also accepts `--seconds S`, `--mode pmkid|handshake`, and `--out

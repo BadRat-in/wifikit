@@ -284,6 +284,17 @@ def build_parser() -> argparse.ArgumentParser:
         "and show how to install any that are missing.",
     )
     ap.add_argument(
+        "--setup",
+        action="store_true",
+        help="Install the missing external tools via your package manager "
+        "(brew/apt/dnf/pacman). Use --yes to skip the prompt.",
+    )
+    ap.add_argument(
+        "--yes",
+        action="store_true",
+        help="Assume yes for prompts (e.g. non-interactive --setup).",
+    )
+    ap.add_argument(
         "--exec", metavar="CMD", help="One-shot: send CMD, print output, exit."
     )
     ap.add_argument(
@@ -343,6 +354,12 @@ def main(argv: list[str] | None = None) -> int:
         from . import doctor
 
         return doctor.run_doctor()
+
+    if args.setup:
+        # Install missing external tools via the OS package manager.
+        from . import bootstrap
+
+        return bootstrap.run_setup(assume_yes=args.yes)
 
     if args.exec is not None:
         return run_once(
