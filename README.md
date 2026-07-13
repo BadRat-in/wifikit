@@ -108,6 +108,25 @@ With pipx:
 pipx install wifikit
 ```
 
+Installing wifikit pulls its **Python** dependencies automatically (including
+`esptool` for flashing). Nothing else is needed to **scan, deauth, or capture**.
+
+## Requirements: external tools (for cracking)
+
+The **cracking** half of the workflow shells out to native CLI tools that pip
+**cannot** install — grab them from your OS package manager. They're optional:
+everything except cracking works without them. Run `wifikit --doctor` any time to
+see what's present and how to install the rest.
+
+| Tool | Needed for | macOS | Debian/Ubuntu |
+| :-- | :-- | :-- | :-- |
+| `hashcat` | crack WPA (Crack tab, `--benchmark`) | `brew install hashcat` | `sudo apt install hashcat` |
+| `hcxtools` (`hcxpcapngtool`) | convert `.pcap` → `.hc22000` | `brew install hcxtools` | `sudo apt install hcxtools` |
+| `aircrack-ng` | alternative cracker (optional) | `brew install aircrack-ng` | `sudo apt install aircrack-ng` |
+
+The **ESP32 firmware** is not a manual dependency — `wifikit-flash` downloads the
+correct Marauder build on demand from the official release.
+
 ## Flash the ESP32
 
 `wifikit-flash` downloads the **correct classic-ESP32 build** (the `old_hardware`
@@ -133,6 +152,7 @@ wifikit --capture --channel 3 # stream a pcap over USB into captures/ (no SD)
 wifikit --list-ports          # show candidate serial ports
 wifikit --demo                # try the TUI with sample data (no board needed)
 wifikit --benchmark           # measure this GPU's WPA crack rate + time table
+wifikit --doctor              # check external tools (hashcat, hcxtools) + hints
 ```
 
 `--capture` also accepts `--seconds S`, `--mode pmkid|handshake`, and `--out

@@ -278,6 +278,12 @@ def build_parser() -> argparse.ArgumentParser:
         "crack-time table. Needs no board.",
     )
     ap.add_argument(
+        "--doctor",
+        action="store_true",
+        help="Check for the external tools (hashcat, hcxtools, …) wifikit uses "
+        "and show how to install any that are missing.",
+    )
+    ap.add_argument(
         "--exec", metavar="CMD", help="One-shot: send CMD, print output, exit."
     )
     ap.add_argument(
@@ -331,6 +337,12 @@ def main(argv: list[str] | None = None) -> int:
         from . import bench
 
         return bench.run_benchmark()
+
+    if args.doctor:
+        # External-tool availability report — no serial port needed.
+        from . import doctor
+
+        return doctor.run_doctor()
 
     if args.exec is not None:
         return run_once(
