@@ -25,6 +25,11 @@ env/
 *.hc22000
 .wifikit_history
 
+# Wordlists: keep the small example + README; real/large wordlists stay local.
+/wordlists/*
+!/wordlists/example-passwords.txt
+!/wordlists/README.md
+
 # Internal session working docs — kept local, not part of the published repo.
 # Public documentation lives in docs/.
 /HANDOFF.md

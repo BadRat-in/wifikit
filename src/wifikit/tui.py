@@ -66,6 +66,18 @@ from .marauder import Station, Target, parse_list_line, parse_station_lines
 from .session import Esp32Session, find_port
 
 
+def default_wordlist() -> str:
+    """
+    Pick the wordlist for the prefilled crack command.
+
+    Prefers the real ``wordlists/rockyou.txt`` if it has been downloaded (see
+    ``wordlists/README.md``), otherwise falls back to the small committed
+    ``wordlists/example-passwords.txt`` so the command is always runnable.
+    """
+    real = Path("wordlists/rockyou.txt")
+    return str(real) if real.exists() else "wordlists/example-passwords.txt"
+
+
 class ActionsScreen(ModalScreen[str]):
     """
     Modal popup listing the actions available for a selected target.
@@ -559,7 +571,7 @@ class WifikitApp(App):
             hc = convert_hc22000(str(out))
             if hc:
                 log.write(f"[capture] hc22000 ready ({eapol} EAPOL): {hc}")
-                crack_input.value = f"hashcat -m 22000 {hc} wordlist.txt"
+                crack_input.value = f"hashcat -m 22000 {hc} {default_wordlist()}"
             else:
                 log.write(
                     "[capture] EAPOL captured — install hcxtools "

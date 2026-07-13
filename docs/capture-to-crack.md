@@ -163,12 +163,12 @@ file and crack:
 ```bash
 brew install hcxtools                          # provides hcxpcapngtool
 hcxpcapngtool -o out.hc22000 out.pcap          # pcap → hc22000
-hashcat -m 22000 out.hc22000 wordlist.txt      # crack (offline, no radio)
+hashcat -m 22000 out.hc22000 wordlists/rockyou.txt      # crack (offline, no radio)
 ```
 
 wifikit **auto-converts** for you when `hcxtools` is installed *and* EAPOL
 frames were captured — the CLI prints the resulting `.hc22000` path, and the
-TUI pre-fills the Crack tab with the ready `hashcat -m 22000 … wordlist.txt`
+TUI pre-fills the Crack tab with the ready `hashcat -m 22000 … wordlists/rockyou.txt`
 command. When `hcxtools` isn't installed, it pre-fills the
 `hcxpcapngtool` conversion command instead so you can run it once the tool
 is on `PATH`. The `.pcap` is always usable directly in Wireshark or with
@@ -221,7 +221,7 @@ A full authorised loop from cold start to a cracked (or attempted) key:
    your own shell:
 
    ```bash
-   hashcat -m 22000 captures/out.hc22000 wordlist.txt
+   hashcat -m 22000 captures/out.hc22000 wordlists/rockyou.txt
    ```
 
 That's the whole loop, on one USB cable, with no SD card and no custom

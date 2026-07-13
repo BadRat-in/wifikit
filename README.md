@@ -184,7 +184,9 @@ No SD card required — the capture streams over USB straight to your Mac.
    **reassembles the streamed `.pcap` into `captures/`** — then converts it via
    `hcxpcapngtool` to an `hc22000` line.
 5. In the **Crack** tab, run e.g.
-   `hashcat -m 22000 capture.hc22000 wordlist.txt` — output streams live.
+   `hashcat -m 22000 capture.hc22000 wordlists/rockyou.txt` — output streams
+   live. See [`wordlists/`](wordlists/README.md) for the example list and how to
+   fetch a real one.
 
 ## How it works
 
