@@ -65,6 +65,17 @@ attack code.
  s Scan  x Stop  r Refresh  a Actions  d Deauth  p PMKID  ^r Reconnect  q Quit
 ```
 
+## Documentation
+
+Full guides live in [`docs/`](docs/index.md):
+
+- [Overview & mental model](docs/index.md) — what wifikit is and how to navigate.
+- [Architecture](docs/architecture.md) — modules, data flow, threading.
+- [Usage](docs/usage.md) — flashing, the TUI, the CLI/REPL, hotkeys.
+- [Capture → crack](docs/capture-to-crack.md) — the SD-free `-serial` workflow.
+- [Firmware](docs/firmware.md) — the Marauder build, `-serial`, future plans.
+- [Troubleshooting](docs/troubleshooting.md) — ports, baud, captures, and more.
+
 ## Hardware
 
 - An **ESP32** board (developed and tested on a classic **ESP32-WROOM-32**
