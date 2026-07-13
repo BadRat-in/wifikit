@@ -2,17 +2,21 @@ name: Release
 
 # Cut a PyPI release by pushing a version tag, e.g.:
 #   git tag v0.1.0 && git push origin v0.1.0
-# hatch-vcs turns the tag into the package version, and the package is published
-# to PyPI using an API token stored as the repo secret PYPI_API_TOKEN.
+# hatch-vcs turns the tag into the package version; uv builds and publishes to
+# PyPI using the PYPI_API_TOKEN repo secret, then a GitHub Release is created.
+# Deliberately uses only uv + the gh CLI (no third-party publish action) so the
+# job doesn't depend on resolving a flaky external Docker action.
 on:
   push:
     tags:
       - "v*"
 
 jobs:
-  build:
-    name: Build sdist + wheel
+  release:
+    name: Build, publish to PyPI, and create a GitHub Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub Release
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,44 +27,13 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Build
+      - name: Build sdist + wheel
         run: uv build
 
-      - name: Show built version
-        run: ls -l dist/
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
-  publish:
-    name: Publish to PyPI
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
-      - name: Publish
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          # API token stored as a repo secret (Settings → Secrets → Actions).
-          password: ${{ secrets.PYPI_API_TOKEN }}
-
-  github-release:
-    name: GitHub Release
-    needs: publish
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
+      - name: Publish to PyPI
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: uv publish
 
       - name: Create GitHub Release with artifacts
         env:
