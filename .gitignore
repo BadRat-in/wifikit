@@ -34,6 +34,7 @@ env/
 # Public documentation lives in docs/.
 /HANDOFF.md
 /CAPTURE_STREAMING.md
+/MULTI_BACKEND.md
 
 # OS / editor
 .DS_Store
