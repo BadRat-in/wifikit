@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# uv
+# (uv.lock IS committed for apps; keep it tracked)
+
+# Firmware blobs are fetched at flash time, never vendored
+*.bin
+
+# Session / capture artifacts
+*.pcap
+*.pcapng
+*.hc22000
+.wifikit_history
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
