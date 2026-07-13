@@ -38,6 +38,7 @@ host is the brain.**
 | Understand the codebase and data flow | [architecture.md](architecture.md) |
 | Flash the board and run the TUI/CLI | [usage.md](usage.md) |
 | Capture a handshake/PMKID and crack it (no SD card) | [capture-to-crack.md](capture-to-crack.md) |
+| See crack-speed numbers and how the GPU is used | [performance.md](performance.md) |
 | Know what firmware runs and future firmware plans | [firmware.md](firmware.md) |
 | Fix a problem (no port, no frames, etc.) | [troubleshooting.md](troubleshooting.md) |
 

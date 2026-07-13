@@ -272,6 +272,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Launch the TUI with sample data and no board (for trying the UI).",
     )
     ap.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Measure this GPU's WPA (hashcat -m 22000) crack rate and print a "
+        "crack-time table. Needs no board.",
+    )
+    ap.add_argument(
         "--exec", metavar="CMD", help="One-shot: send CMD, print output, exit."
     )
     ap.add_argument(
@@ -319,6 +325,12 @@ def main(argv: list[str] | None = None) -> int:
         for score, p in list_candidate_ports():
             print(f"[{score:>4}] {p.device:35} {p.description or ''}")
         return 0
+
+    if args.benchmark:
+        # Pure host-side GPU benchmark — no serial port needed.
+        from . import bench
+
+        return bench.run_benchmark()
 
     if args.exec is not None:
         return run_once(

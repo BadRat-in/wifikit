@@ -80,6 +80,7 @@ Full guides live in [`docs/`](docs/index.md):
 - [Architecture](docs/architecture.md) — modules, data flow, threading.
 - [Usage](docs/usage.md) — flashing, the TUI, the CLI/REPL, hotkeys.
 - [Capture → crack](docs/capture-to-crack.md) — the SD-free `-serial` workflow.
+- [Performance & GPU](docs/performance.md) — measured crack rates, `--benchmark`.
 - [Firmware](docs/firmware.md) — the Marauder build, `-serial`, future plans.
 - [Troubleshooting](docs/troubleshooting.md) — ports, baud, captures, and more.
 
@@ -131,6 +132,7 @@ wifikit --exec "scanall" --timeout 15   # one-shot, print output, exit
 wifikit --capture --channel 3 # stream a pcap over USB into captures/ (no SD)
 wifikit --list-ports          # show candidate serial ports
 wifikit --demo                # try the TUI with sample data (no board needed)
+wifikit --benchmark           # measure this GPU's WPA crack rate + time table
 ```
 
 `--capture` also accepts `--seconds S`, `--mode pmkid|handshake`, and `--out

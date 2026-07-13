@@ -62,6 +62,7 @@ wifikit --list-ports                    # list candidate serial ports and exit
 wifikit --port /dev/cu.usbserial-XXXX   # target a specific device
 wifikit --no-reset                      # don't reset the board on connect
 wifikit --demo                          # TUI with sample data, no board needed
+wifikit --benchmark                     # measure GPU WPA crack rate (see performance.md)
 ```
 
 `--timeout` (default `6`) is how long `--exec` reads before exiting.
