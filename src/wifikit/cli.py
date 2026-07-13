@@ -118,16 +118,24 @@ def run_capture_cli(
     print(f"  blobs:      {result.blob_count}")
     print(f"  bytes:      {result.byte_count}")
     print(f"  valid pcap: {result.valid_pcap}")
-    print(f"  saw EAPOL:  {result.saw_eapol}   saw PMKID: {result.saw_pmkid}")
+    print(f"  frames:     {result.frame_count}  (EAPOL: {result.eapol_frames})")
 
-    # Only attempt conversion when a pcap actually landed on disk.
-    if result.pcap_path:
+    # No EAPOL means nothing crackable was captured (beacons/mgmt only). A PMKID
+    # or handshake appears only when a client (re)associates during the window —
+    # forcing that needs an authorised deauth of a client on your own network.
+    if result.pcap_path and result.eapol_frames == 0:
+        print(
+            "  note:       no EAPOL captured — needs a client (re)association; "
+            "run a brief deauth on your own AP to elicit one."
+        )
+
+    # Only attempt conversion when EAPOL frames were actually captured.
+    if result.pcap_path and result.eapol_frames > 0:
         hc = capture.convert_hc22000(result.pcap_path)
         if hc:
             print(f"  hc22000:    {hc}")
         else:
-            # No file usually means hcxtools is missing or nothing crackable yet.
-            print("  hc22000:    (skipped — install hcxtools: brew install hcxtools)")
+            print("  hc22000:    (install hcxtools to convert: brew install hcxtools)")
     return 0
 
 

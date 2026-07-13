@@ -60,6 +60,12 @@ PCAP_MAGICS = (
     b"\x4d\x3c\xb2\xa1",  # nanosecond, LE
 )
 
+# LLC/SNAP header + EtherType 0x888E that prefixes an EAPOL payload inside an
+# 802.11 data frame. Presence of this in a captured frame means a *real* EAPOL
+# key frame (the crackable part of a handshake/PMKID) — unlike the firmware's
+# console banner, which prints "PMKID"/"EAPOL" regardless of what was captured.
+EAPOL_LLC_SNAP = b"\xaa\xaa\x03\x00\x00\x00\x88\x8e"
+
 # Marauder sniff commands per capture mode; ``-serial`` makes them stream pcap.
 CAPTURE_MODES = {
     # PMKID is often clientless; sniffpmkid takes the channel directly.
@@ -84,6 +90,48 @@ def looks_like_pcap(data: bytes) -> bool:
         True if the first four bytes match a known pcap magic, else False.
     """
     return len(data) >= 4 and data[:4] in PCAP_MAGICS
+
+
+def pcap_frame_stats(data: bytes) -> tuple[int, int]:
+    """
+    Walk a pcap byte stream and count total frames and EAPOL frames.
+
+    Reads the 24-byte global header (honouring its endianness), then iterates the
+    16-byte-prefixed packet records. A frame counts as EAPOL if it contains the
+    LLC/SNAP + EtherType-0x888E signature (:data:`EAPOL_LLC_SNAP`) — this is the
+    *only* trustworthy "did we capture something crackable?" signal, because the
+    firmware's console banner prints "PMKID"/"EAPOL" regardless of what actually
+    landed in the capture.
+
+    Parameters
+    ----------
+    data : bytes
+        The assembled pcap bytes.
+
+    Returns
+    -------
+    tuple[int, int]
+        ``(frame_count, eapol_frame_count)``; ``(0, 0)`` if not a parseable pcap.
+    """
+    if not looks_like_pcap(data) or len(data) < 24:
+        return (0, 0)
+    # First magic byte 0xD4/0x4D ⇒ little-endian file; 0xA1 ⇒ big-endian.
+    order = "little" if data[0] in (0xD4, 0x4D) else "big"
+    frames = 0
+    eapol = 0
+    off = 24
+    total = len(data)
+    while off + 16 <= total:
+        incl = int.from_bytes(data[off + 8 : off + 12], order)
+        off += 16
+        if incl == 0 or off + incl > total:
+            break  # truncated final record (stream cut mid-flush) — stop cleanly
+        frame = data[off : off + incl]
+        off += incl
+        frames += 1
+        if EAPOL_LLC_SNAP in frame:
+            eapol += 1
+    return (frames, eapol)
 
 
 class SavePcapStreamParser:
@@ -175,10 +223,12 @@ class CaptureResult:
         Total pcap bytes written.
     valid_pcap : bool
         Whether the recovered bytes start with a recognised pcap magic.
-    saw_eapol : bool
-        Whether the firmware's console output mentioned an EAPOL frame.
-    saw_pmkid : bool
-        Whether the firmware's console output mentioned a PMKID.
+    frame_count : int
+        Number of 802.11 frames in the captured pcap.
+    eapol_frames : int
+        Number of frames containing an EAPOL payload — the trustworthy signal
+        that something crackable (handshake/PMKID) was actually captured, parsed
+        from the frames themselves rather than the firmware's console banner.
     log_tail : list[str]
         The last few console lines, for a human-readable summary.
     """
@@ -187,8 +237,8 @@ class CaptureResult:
     blob_count: int
     byte_count: int
     valid_pcap: bool
-    saw_eapol: bool
-    saw_pmkid: bool
+    frame_count: int
+    eapol_frames: int
     log_tail: list[str] = field(default_factory=list)
 
 
@@ -277,7 +327,6 @@ def run_capture(
         dev.close()
 
     pcap = parser.pcap_bytes()
-    joined = "\n".join(lines).lower()
     out = out_path or _default_out_path()
     written: str | None = None
     if pcap:
@@ -286,13 +335,14 @@ def run_capture(
             fh.write(pcap)
         written = out
 
+    frames, eapol = pcap_frame_stats(pcap)
     return CaptureResult(
         pcap_path=written,
         blob_count=parser.blob_count(),
         byte_count=len(pcap),
         valid_pcap=looks_like_pcap(pcap),
-        saw_eapol="eapol" in joined,
-        saw_pmkid="pmkid" in joined,
+        frame_count=frames,
+        eapol_frames=eapol,
         log_tail=lines[-8:],
     )
 

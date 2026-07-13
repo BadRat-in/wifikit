@@ -10,8 +10,10 @@ which is where demux bugs would otherwise hide.
 from wifikit.capture import (
     BUF_BEGIN,
     BUF_CLOSE,
+    EAPOL_LLC_SNAP,
     SavePcapStreamParser,
     looks_like_pcap,
+    pcap_frame_stats,
 )
 
 # A known-valid 24-byte little-endian libpcap global header
@@ -22,6 +24,12 @@ PCAP = (
     + b"\xff\xff\x00\x00"
     + b"\x69\x00\x00\x00"
 )
+
+
+def _pcap_record(frame: bytes) -> bytes:
+    """Wrap a raw frame in a 16-byte little-endian pcap record header."""
+    n = len(frame).to_bytes(4, "little")
+    return b"\x00" * 8 + n + n + frame  # ts_sec, ts_usec, incl_len, orig_len
 
 
 def test_single_blob_recovered():
@@ -66,3 +74,20 @@ def test_two_blobs():
 
 def test_looks_like_pcap_rejects_junk():
     assert not looks_like_pcap(b"not a pcap")
+
+
+def test_pcap_frame_stats_counts_frames_and_eapol():
+    # Two frames: a plain beacon-ish frame (no EAPOL) and one carrying the
+    # LLC/SNAP + EtherType 0x888E EAPOL signature.
+    beacon = b"\x80\x00" + b"\x11" * 20
+    eapol = b"\x08\x02" + b"\x22" * 10 + EAPOL_LLC_SNAP + b"\x03\x00\x5f"
+    data = PCAP + _pcap_record(beacon) + _pcap_record(eapol)
+    frames, eapol_count = pcap_frame_stats(data)
+    assert frames == 2
+    assert eapol_count == 1
+
+
+def test_pcap_frame_stats_rejects_non_pcap():
+    # Non-pcap input (and a header-only pcap with no records) yields no frames.
+    assert pcap_frame_stats(b"not a pcap") == (0, 0)
+    assert pcap_frame_stats(PCAP) == (0, 0)

@@ -60,6 +60,7 @@ from .capture import (
     SavePcapStreamParser,
     convert_hc22000,
     looks_like_pcap,
+    pcap_frame_stats,
 )
 from .marauder import Station, Target, parse_list_line, parse_station_lines
 from .session import Esp32Session, find_port
@@ -510,23 +511,33 @@ class WifikitApp(App):
         Path("captures").mkdir(exist_ok=True)
         out = Path("captures") / f"capture-{int(time.time())}.pcap"
         out.write_bytes(pcap)
+        frames, eapol = pcap_frame_stats(pcap)
         valid = "valid" if looks_like_pcap(pcap) else "UNRECOGNISED"
         log.write(
-            f"[capture] wrote {out} ({len(pcap)} bytes, {parser.blob_count()} "
-            f"blocks, {valid} pcap header)."
+            f"[capture] wrote {out} ({len(pcap)} bytes, {frames} frames, "
+            f"EAPOL: {eapol}, {valid} pcap)."
         )
-        # Convert to hc22000 if hcxpcapngtool is installed; prefill the crack cmd.
-        hc = convert_hc22000(str(out))
         crack_input = self.query_one("#crack_input", Input)
-        if hc:
-            log.write(f"[capture] hc22000 ready: {hc}")
-            crack_input.value = f"hashcat -m 22000 {hc} wordlist.txt"
-        else:
+        convert_cmd = f"hcxpcapngtool -o {out.with_suffix('.hc22000')} {out}"
+        if eapol == 0:
+            # Beacons/mgmt only — nothing crackable. A PMKID/handshake needs a
+            # client (re)association; suggest a brief authorised deauth.
             log.write(
-                "[capture] install hcxtools (brew install hcxtools) to auto-build "
-                "the hc22000, or open the .pcap in Wireshark."
+                "[capture] no EAPOL captured — nothing crackable yet. Deauth the "
+                "AP briefly (Actions → Deauth) to force a client to reconnect."
             )
-            crack_input.value = f"hcxpcapngtool -o {out.with_suffix('.hc22000')} {out}"
+            crack_input.value = convert_cmd
+        else:
+            hc = convert_hc22000(str(out))
+            if hc:
+                log.write(f"[capture] hc22000 ready ({eapol} EAPOL): {hc}")
+                crack_input.value = f"hashcat -m 22000 {hc} wordlist.txt"
+            else:
+                log.write(
+                    "[capture] EAPOL captured — install hcxtools "
+                    "(brew install hcxtools) to build the hc22000."
+                )
+                crack_input.value = convert_cmd
         crack_input.focus()
 
     # ---- inputs ------------------------------------------------------------
