@@ -120,8 +120,7 @@ def format_report(rate: float) -> str:
     """Render the human-readable benchmark summary + crack-time table."""
     lines = [
         f"WPA (hashcat -m {HASHCAT_MODE}) rate: {rate:,.0f} H/s",
-        f"  = {rate * 60:,.0f}/min · {rate * 3600:,.0f}/hour · "
-        f"{rate * 86400:,.0f}/day",
+        f"  = {rate * 60:,.0f}/min · {rate * 3600:,.0f}/hour · {rate * 86400:,.0f}/day",
         "",
         "Time to exhaust a keyspace at this rate "
         "(a random password is found in ~half):",
