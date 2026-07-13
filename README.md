@@ -2,12 +2,12 @@
 
 **A terminal UI + CLI for driving an ESP32 running the [ESP32 Marauder][marauder] firmware — for authorized WiFi security testing and learning.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/BadRat-in/wifikit/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![CI](https://github.com/BadRat-in/wifikit/actions/workflows/ci.yml/badge.svg)](https://github.com/BadRat-in/wifikit/actions/workflows/ci.yml)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Built with Textual](https://img.shields.io/badge/built%20with-Textual-5a2ca0.svg)](https://github.com/Textualize/textual)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/BadRat-in/wifikit/blob/main/CONTRIBUTING.md)
 
 `wifikit` turns the raw Marauder serial command line into a single-screen,
 target-oriented dashboard. Instead of memorising commands or juggling the
@@ -16,7 +16,7 @@ a third window), you **scan**, **pick a target from a live table**, and act on
 it from a menu or with hotkeys — then run the host-side crack from the same UI.
 
 <p align="center">
-  <img src="docs/assets/wifikit.gif" width="820"
+  <img src="https://raw.githubusercontent.com/BadRat-in/wifikit/main/docs/assets/wifikit.gif" width="820"
        alt="wifikit TUI cycling through the Targets, Stations, Console and Crack tabs">
 </p>
 
@@ -74,15 +74,15 @@ attack code.
 
 ## Documentation
 
-Full guides live in [`docs/`](docs/index.md):
+Full guides live in [`docs/`](https://github.com/BadRat-in/wifikit/tree/main/docs):
 
-- [Overview & mental model](docs/index.md) — what wifikit is and how to navigate.
-- [Architecture](docs/architecture.md) — modules, data flow, threading.
-- [Usage](docs/usage.md) — flashing, the TUI, the CLI/REPL, hotkeys.
-- [Capture → crack](docs/capture-to-crack.md) — the SD-free `-serial` workflow.
-- [Performance & GPU](docs/performance.md) — measured crack rates, `--benchmark`.
-- [Firmware](docs/firmware.md) — the Marauder build, `-serial`, future plans.
-- [Troubleshooting](docs/troubleshooting.md) — ports, baud, captures, and more.
+- [Overview & mental model](https://github.com/BadRat-in/wifikit/blob/main/docs/index.md) — what wifikit is and how to navigate.
+- [Architecture](https://github.com/BadRat-in/wifikit/blob/main/docs/architecture.md) — modules, data flow, threading.
+- [Usage](https://github.com/BadRat-in/wifikit/blob/main/docs/usage.md) — flashing, the TUI, the CLI/REPL, hotkeys.
+- [Capture → crack](https://github.com/BadRat-in/wifikit/blob/main/docs/capture-to-crack.md) — the SD-free `-serial` workflow.
+- [Performance & GPU](https://github.com/BadRat-in/wifikit/blob/main/docs/performance.md) — measured crack rates, `--benchmark`.
+- [Firmware](https://github.com/BadRat-in/wifikit/blob/main/docs/firmware.md) — the Marauder build, `-serial`, future plans.
+- [Troubleshooting](https://github.com/BadRat-in/wifikit/blob/main/docs/troubleshooting.md) — ports, baud, captures, and more.
 
 ## Hardware
 
@@ -186,8 +186,8 @@ uv run ruff format .          # format
 uv run pytest                 # tests (parser/port logic run without hardware)
 ```
 
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) and the
-[Code of Conduct](CODE_OF_CONDUCT.md). Security reports: see [SECURITY.md](SECURITY.md).
+Please read [CONTRIBUTING.md](https://github.com/BadRat-in/wifikit/blob/main/CONTRIBUTING.md) and the
+[Code of Conduct](https://github.com/BadRat-in/wifikit/blob/main/CODE_OF_CONDUCT.md). Security reports: see [SECURITY.md](https://github.com/BadRat-in/wifikit/blob/main/SECURITY.md).
 
 ## Acknowledgements & credits
 
@@ -207,7 +207,7 @@ support them:
 
 ## License
 
-[MIT](LICENSE) © 2026 Ravindra Singh. The ESP32 Marauder firmware is the property
+[MIT](https://github.com/BadRat-in/wifikit/blob/main/LICENSE) © 2026 Ravindra Singh. The ESP32 Marauder firmware is the property
 of its respective authors under its own license.
 
 [marauder]: https://github.com/justcallmekoko/ESP32Marauder
