@@ -3,7 +3,7 @@ name: Release
 # Cut a PyPI release by pushing a version tag, e.g.:
 #   git tag v0.1.0 && git push origin v0.1.0
 # hatch-vcs turns the tag into the package version, and the package is published
-# to PyPI via Trusted Publishing (OIDC) — no API token is stored in the repo.
+# to PyPI using an API token stored as the repo secret PYPI_API_TOKEN.
 on:
   push:
     tags:
@@ -38,14 +38,6 @@ jobs:
     name: Publish to PyPI
     needs: build
     runs-on: ubuntu-latest
-    # Trusted Publishing needs the environment + id-token permission. Configure a
-    # matching "pending publisher" on PyPI (project wifikit, this repo, workflow
-    # release.yml, environment pypi) before the first tag push.
-    environment:
-      name: pypi
-      url: https://pypi.org/p/wifikit
-    permissions:
-      id-token: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -54,6 +46,9 @@ jobs:
 
       - name: Publish
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # API token stored as a repo secret (Settings → Secrets → Actions).
+          password: ${{ secrets.PYPI_API_TOKEN }}
 
   github-release:
     name: GitHub Release
