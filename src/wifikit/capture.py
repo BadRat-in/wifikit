@@ -67,11 +67,13 @@ PCAP_MAGICS = (
 EAPOL_LLC_SNAP = b"\xaa\xaa\x03\x00\x00\x00\x88\x8e"
 
 # Marauder sniff commands per capture mode; ``-serial`` makes them stream pcap.
+# Both modes use ``sniffpmkid`` — despite the name it captures the EAPOL frames
+# of a full 4-way handshake as well as clientless PMKIDs, and ``hcxpcapngtool``
+# extracts whichever is present. (``sniffpwn`` is a Pwnagotchi beacon sniffer,
+# NOT a handshake capturer — do not use it here.)
 CAPTURE_MODES = {
-    # PMKID is often clientless; sniffpmkid takes the channel directly.
     "pmkid": ["sniffpmkid -c {channel} -serial"],
-    # Handshake capture: pin the radio to the channel, then sniff EAPOL.
-    "handshake": ["channel -s {channel}", "sniffpwn -serial"],
+    "handshake": ["sniffpmkid -c {channel} -serial"],
 }
 
 
