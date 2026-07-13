@@ -485,6 +485,12 @@ class WifikitApp(App):
         }
         for cmd in seqs.get(action, []):
             self.tx(cmd)
+        if action == "deauth":
+            self.notify(
+                f"Deauth sent to {t.name} (ch {t.ch}). No effect if the AP uses "
+                "PMF/802.11w (common on mesh & WPA3).",
+                timeout=6,
+            )
 
     # ---- SD-free capture (Marauder -serial → host pcap) --------------------
 
@@ -500,6 +506,15 @@ class WifikitApp(App):
         if not self.session:
             self.notify("Not connected — press Ctrl-R", severity="warning")
             return
+        # Make the capture visible: notify, and switch to the Crack tab where the
+        # live progress and result are logged (otherwise it looks like nothing
+        # happened). A handshake also needs a client to (re)associate on this
+        # channel during the window — deauth first (d) on a non-PMF network.
+        self.notify(
+            f"Capturing {mode} on {t.name} (ch {t.ch}) for "
+            f"{self.CAPTURE_SECS:.0f}s — watch the Crack tab."
+        )
+        self.query_one(TabbedContent).active = "crack"
         self.run_worker(self._run_capture(t, mode), exclusive=False)
 
     async def _run_capture(self, target: Target, mode: str) -> None:
@@ -532,7 +547,17 @@ class WifikitApp(App):
             for tmpl in CAPTURE_MODES[mode]:
                 self.tx(tmpl.format(channel=target.ch), echo=False)
                 await asyncio.sleep(0.2)
-            await asyncio.sleep(self.CAPTURE_SECS)
+            # Sleep in chunks so we can show a live heartbeat — a long silent
+            # wait is exactly what reads as "nothing is happening".
+            elapsed = 0.0
+            while elapsed < self.CAPTURE_SECS:
+                await asyncio.sleep(min(5.0, self.CAPTURE_SECS - elapsed))
+                elapsed += 5.0
+                frames, eapol = pcap_frame_stats(parser.pcap_bytes())
+                log.write(
+                    f"[capture] {min(elapsed, self.CAPTURE_SECS):.0f}/"
+                    f"{self.CAPTURE_SECS:.0f}s — {frames} frames, EAPOL {eapol}"
+                )
             self.tx("stopscan", echo=False)
             await asyncio.sleep(0.5)
         finally:
