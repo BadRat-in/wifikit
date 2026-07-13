@@ -1,10 +1,12 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "wifikit"
-version = "0.1.0"
+# Version is derived from the git tag (e.g. v0.1.0 -> 0.1.0) by hatch-vcs, so a
+# release is cut purely by tagging — see .github/workflows/release.yml.
+dynamic = ["version"]
 description = "Terminal UI + CLI to drive an ESP32 running the Marauder firmware for authorized WiFi security testing."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -51,6 +53,10 @@ dev = [
     "ruff>=0.6",
     "pytest>=8.0",
 ]
+
+[tool.hatch.version]
+# Read the version from the latest git tag (hatch-vcs / setuptools-scm style).
+source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/wifikit"]
