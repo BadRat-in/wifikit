@@ -148,11 +148,14 @@ class WifikitApp(App):
         Binding("q", "quit", "Quit"),
     ]
 
-    def __init__(self, port: str | None = None) -> None:
+    def __init__(self, port: str | None = None, demo: bool = False) -> None:
         super().__init__()
         self._port_arg = port
+        # Demo mode seeds the tables with fake targets/stations and never opens a
+        # serial port — for screenshots/GIFs and for trying the UI with no board.
+        self.demo = demo
         self.session: Esp32Session | None = None
-        self.port: str | None = None
+        self.port: str | None = "/dev/cu.usbserial-DEMO" if demo else None
         self._rxq: queue.Queue[str] = queue.Queue()
         self._linebuf = ""
         self.targets: dict[int, Target] = {}  # keyed by Marauder index
@@ -210,8 +213,33 @@ class WifikitApp(App):
             "machine and streams here. Capture files land in ./captures (via the "
             "Capture action — streamed over USB, no SD card needed)."
         )
+        if self.demo:
+            self._seed_demo()
+            return
         self.set_interval(0.05, self._drain_serial)
         self.connect()
+
+    def _seed_demo(self) -> None:
+        """Populate the tables with sample data for screenshots / no-board demos."""
+        self.targets = {
+            0: Target(0, 6, "rb_alderson", -52),
+            1: Target(1, 6, "rb_alderson", -58),
+            2: Target(2, 11, "Cafe_Guest", -67),
+            3: Target(3, 1, "0e:ef:15:a9:3b:d2", -81),
+        }
+        self.stations = [
+            Station(4, "A4:83:E7:11:22:33", ap_idx=0, ap_name="rb_alderson"),
+            Station(7, "DE:AD:BE:EF:00:01", ap_idx=2, ap_name="Cafe_Guest"),
+        ]
+        self._refresh_table()
+        sta = self.query_one("#sta_table", DataTable)
+        sta.clear()
+        for s in self.stations:
+            sta.add_row(str(s.idx), s.mac, s.ap_name or "?", "✓" if s.selected else "")
+        self._log("[demo] seeded sample data — no board connected")
+        self._log(">>> scanall")
+        self._log("Scanning for APs and Stations. Stop with stopscan")
+        self._update_status()
 
     # ---- serial plumbing ---------------------------------------------------
 
@@ -304,7 +332,7 @@ class WifikitApp(App):
             table.add_row(str(s.idx), s.mac, ap, "✓" if s.selected else "")
 
     def _update_status(self) -> None:
-        conn = f"● {self.port}" if self.session else "○ disconnected"
+        conn = f"● {self.port}" if (self.session or self.demo) else "○ disconnected"
         if self.capturing:
             state = "CAPTURING"
         elif self.scanning:
@@ -314,7 +342,7 @@ class WifikitApp(App):
         self.query_one("#status", Static).update(
             f" {conn}    {state}    APs: {len(self.targets)}  "
             f"STAs: {len(self.stations)}    "
-            f"keys: s scan · x stop · c capture · ↵ actions "
+            f"keys: s scan · x stop · c capture · enter actions "
         )
 
     def _log(self, msg: str) -> None:
@@ -577,9 +605,9 @@ class WifikitApp(App):
             self.session.close()
 
 
-def run(port: str | None = None) -> int:
+def run(port: str | None = None, demo: bool = False) -> int:
     """Entry point: launch the TUI. Returns a process exit code."""
-    WifikitApp(port=port).run()
+    WifikitApp(port=port, demo=demo).run()
     return 0
 
 

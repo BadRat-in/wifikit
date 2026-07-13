@@ -15,6 +15,13 @@ multi-terminal aircrack-ng workflow (airodump here, aireplay there, aircrack in
 a third window), you **scan**, **pick a target from a live table**, and act on
 it from a menu or with hotkeys — then run the host-side crack from the same UI.
 
+<p align="center">
+  <img src="docs/assets/wifikit.gif" width="820"
+       alt="wifikit TUI cycling through the Targets, Stations, Console and Crack tabs">
+</p>
+
+> The demo above runs with `wifikit --demo` (sample data, no board required).
+
 ---
 
 ## ⚠️ Legal & authorized-use notice
@@ -123,6 +130,7 @@ wifikit --cli                 # line-based REPL instead of the TUI
 wifikit --exec "scanall" --timeout 15   # one-shot, print output, exit
 wifikit --capture --channel 3 # stream a pcap over USB into captures/ (no SD)
 wifikit --list-ports          # show candidate serial ports
+wifikit --demo                # try the TUI with sample data (no board needed)
 ```
 
 `--capture` also accepts `--seconds S`, `--mode pmkid|handshake`, and `--out

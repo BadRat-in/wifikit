@@ -267,6 +267,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Force the line-based REPL instead of the TUI.",
     )
     ap.add_argument(
+        "--demo",
+        action="store_true",
+        help="Launch the TUI with sample data and no board (for trying the UI).",
+    )
+    ap.add_argument(
         "--exec", metavar="CMD", help="One-shot: send CMD, print output, exit."
     )
     ap.add_argument(
@@ -338,7 +343,7 @@ def main(argv: list[str] | None = None) -> int:
     # Default: launch the graphical TUI (the intended everyday interface).
     from .tui import run as run_tui
 
-    return run_tui(args.port)
+    return run_tui(args.port, demo=args.demo)
 
 
 if __name__ == "__main__":
