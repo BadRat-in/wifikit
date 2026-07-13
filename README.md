@@ -17,7 +17,7 @@ it from a menu or with hotkeys — then run the host-side crack from the same UI
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/BadRat-in/wifikit/main/docs/assets/wifikit.gif" width="820"
-       alt="wifikit TUI cycling through the Targets, Stations, Console and Crack tabs">
+       alt="wifikit TUI: target table, the Actions menu, the Crack tab, and the Settings tab">
 </p>
 
 > The demo above runs with `wifikit --demo` (sample data, no board required).
@@ -46,8 +46,9 @@ attack code.
 ## Features
 
 - 🖥️ **Textual TUI** (default): live AP table, tabbed layout, mouse + keyboard.
-- 🎯 **Target-oriented**: select an AP, then Deauth / Capture PMKID / Capture
-  handshake / set channel — via an Actions menu (Enter or right-click) or hotkeys.
+- 🎯 **Target-oriented**: select an AP, then Deauth / Capture (handshake + PMKID
+  in one action) / set channel — via an Actions menu (Enter or right-click) or
+  hotkeys.
 - 👥 **Stations tab**: clients grouped by AP (via Marauder's `list -c`), populated
   live during a scan; select a station to deauth it directly.
 - 📥 **SD-free capture**: `wifikit --capture --channel N` streams the pcap over
@@ -57,8 +58,10 @@ attack code.
 - ⌨️ **Nice REPL** (`--cli`): local echo, history and tab-completion — a painless
   replacement for `screen`, which Marauder's non-echoing CLI makes miserable.
 - 🤖 **Scriptable** one-shot mode (`--exec "scanall"`).
-- 🧨 **Integrated cracking**: run `hashcat`/`aircrack-ng` in a Crack tab with live
-  streaming output — scan → deauth → capture → crack in one place.
+- 🧨 **Integrated cracking**: a capture auto-fills a ready `hashcat -m 22000 …`
+  command in the Crack tab — press Enter to run it, output streams live.
+- ⚙️ **Settings tab**: capture duration, auto-deauth, default wordlist, theme and
+  more — persisted to `~/.config/wifikit/config.json`.
 - ⚡ **One-command flashing** of the correct classic-ESP32 build (`wifikit-flash`).
 
 ```
@@ -69,7 +72,7 @@ attack code.
 │  1    3   8e:86:dd:a0:8b:68      -73                                           │
 │  2    3   rb_alderson            -84                                           │
 └──────────────────────────────────────────────────────────────────────────────┘
- s Scan  x Stop  r Refresh  a Actions  d Deauth  p PMKID  ^r Reconnect  q Quit
+ s Scan  x Stop  r Refresh  a Actions  d Deauth  c Capture  ^r Reconnect  q Quit
 ```
 
 ## Documentation
@@ -168,8 +171,9 @@ PATH`. It enables Marauder's `SavePCAP`, sniffs with `-serial`, and reassembles
 the streamed `.pcap` on the host.
 
 **TUI hotkeys:** `s` scan · `x` stop · `r` refresh list · `a`/Enter actions ·
-`d` deauth selected · `p` PMKID selected · `Ctrl-R` reconnect · `q` quit. The
-**Stations** tab lists clients grouped by AP and fills live during a scan.
+`d` deauth selected · `c` capture selected · `y` copy context · `1`–`5` switch
+tab · `Ctrl-R` reconnect · `q` quit. The **Stations** tab lists clients grouped
+by AP and fills live during a scan.
 
 ### The capture → crack loop (on *your own* network)
 
@@ -183,10 +187,10 @@ No SD card required — the capture streams over USB straight to your Mac.
 4. `wifikit` enables Marauder's `SavePCAP`, runs the sniff with `-serial`, and
    **reassembles the streamed `.pcap` into `captures/`** — then converts it via
    `hcxpcapngtool` to an `hc22000` line.
-5. In the **Crack** tab, run e.g.
-   `hashcat -m 22000 capture.hc22000 wordlists/rockyou.txt` — output streams
-   live. See [`wordlists/`](wordlists/README.md) for the example list and how to
-   fetch a real one.
+5. In the **Crack** tab the `hashcat -m 22000 …` command is already
+   pre-filled — **press Enter** to run it; output streams live. See
+   [`wordlists/`](wordlists/README.md) for the example list and how to fetch a
+   real one.
 
 ## How it works
 

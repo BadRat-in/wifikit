@@ -84,14 +84,16 @@ the firmware emits in that case.
 ### TUI (recommended)
 
 1. Scan (`s`), let the target table fill in, and move the cursor to the AP.
-2. Trigger a capture:
-   - press `p` or `c` for a quick **PMKID** capture of the highlighted AP,
-     or
-   - press `a`/Enter to open **Actions** and choose *Capture PMKID → Mac*
-     or *Capture handshake → Mac*.
+2. Trigger a capture — press `c`, or `a`/Enter to open **Actions** and
+   choose **Capture (stream handshake/PMKID to Mac)**. It's a single
+   action, not a PMKID/handshake choice: `sniffpmkid -serial` records the
+   PMKID *and* any 4-way-handshake EAPOL frames into one pcap, and
+   `hcxpcapngtool` extracts whichever actually landed.
 3. The pcap lands in **`./captures/`** and the **Crack tab** is pre-filled
    with the next command (a `hcxpcapngtool` conversion, or a ready
-   `hashcat -m 22000 …` line when EAPOL was captured).
+   `hashcat -m 22000 …` line when EAPOL was captured). To run the crack,
+   switch to the **Crack tab** and **press Enter** in that pre-filled box —
+   the output streams live in the tab.
 
 The TUI taps the session's raw byte stream into the parser only for the
 capture window, so binary pcap bytes never get mangled by the text CLI.
@@ -141,11 +143,16 @@ hardware-verified passive runs produced.
 To force the material to appear, run a brief **authorised** deauth of a
 client on **your own** AP so it disconnects and reconnects:
 
-- **TUI:** open **Actions → Deauth** on the AP (or select a client in the
-  **Stations** tab and press Enter to deauth just that station), then start
-  the capture.
-- The reconnection triggers a fresh EAPOL exchange that lands in your
-  capture window.
+- **Automatically:** turn on **Auto-deauth before capture** in the
+  **Settings** tab. Capture then fires a deauth burst first (its length is
+  the **Deauth burst (seconds)** setting) and immediately sniffs — one
+  coordinated action, no separate step. This is ineffective against
+  PMF/802.11w networks, which reject the deauth.
+- **Manually:** open **Actions → Deauth** on the AP (or select a client in
+  the **Stations** tab and press Enter to deauth just that station), then
+  start the capture.
+- Either way, the reconnection triggers a fresh EAPOL exchange that lands
+  in your capture window.
 
 wifikit tells you honestly whether you got anything, because it reports
 `frames` and `EAPOL` counts **parsed from the pcap itself** — by scanning
@@ -169,9 +176,12 @@ hashcat -m 22000 out.hc22000 wordlists/rockyou.txt      # crack (offline, no rad
 wifikit **auto-converts** for you when `hcxtools` is installed *and* EAPOL
 frames were captured — the CLI prints the resulting `.hc22000` path, and the
 TUI pre-fills the Crack tab with the ready `hashcat -m 22000 … wordlists/rockyou.txt`
-command. When `hcxtools` isn't installed, it pre-fills the
-`hcxpcapngtool` conversion command instead so you can run it once the tool
-is on `PATH`. The `.pcap` is always usable directly in Wireshark or with
+command (the wordlist comes from the **Default wordlist** setting, blank =
+auto-pick). You don't have to retype anything: switch to the **Crack tab**
+and **press Enter** in the pre-filled input box to launch the crack, and its
+output streams live in the tab. When `hcxtools` isn't installed, it pre-fills
+the `hcxpcapngtool` conversion command instead so you can run it once the
+tool is on `PATH`. The `.pcap` is always usable directly in Wireshark or with
 `aircrack-ng` too; `hc22000` is just the most convenient hashcat input.
 
 The cracking itself runs entirely on your Mac — it's pure offline math
@@ -197,15 +207,17 @@ A full authorised loop from cold start to a cracked (or attempted) key:
    table to fill in.
 2. **Pick the AP.** Move the cursor onto **your own** AP. Note its channel
    in the `CH` column — the capture will use it automatically.
-3. **(Optional) force a handshake.** If the network is quiet, open
-   **Actions → Deauth** on the AP (or deauth a specific client from the
-   Stations tab) so a client reconnects during the next step.
-4. **Capture.** Press `p`/`c` for PMKID, or use **Actions → Capture … →
-   Mac**. The pcap streams over USB and lands in `./captures/`.
-   Equivalently from the CLI:
+3. **(Optional) force a handshake.** If the network is quiet, either turn on
+   **Auto-deauth before capture** in **Settings** (Capture then bursts a
+   deauth before it sniffs) or open **Actions → Deauth** on the AP (or deauth
+   a specific client from the Stations tab) so a client reconnects during the
+   next step.
+4. **Capture.** Press `c`, or use **Actions → Capture (stream
+   handshake/PMKID to Mac)** — one action captures both. The pcap streams
+   over USB and lands in `./captures/`. Equivalently from the CLI:
 
    ```bash
-   wifikit --capture --channel 8 --seconds 30 --mode handshake
+   wifikit --capture --channel 8 --seconds 30
    ```
 
 5. **Check.** Read the reported `frames` / `EAPOL` counts. If `EAPOL: 0`,
@@ -217,8 +229,9 @@ A full authorised loop from cold start to a cracked (or attempted) key:
    hcxpcapngtool -o captures/out.hc22000 captures/out.pcap
    ```
 
-7. **Crack.** Feed it to hashcat — in the TUI's Crack tab (pre-filled) or
-   your own shell:
+7. **Crack.** In the TUI's **Crack tab** the `hashcat -m 22000 …` command is
+   already pre-filled — just **press Enter** in that box to run it (output
+   streams live). Or run it yourself in any shell:
 
    ```bash
    hashcat -m 22000 captures/out.hc22000 wordlists/rockyou.txt

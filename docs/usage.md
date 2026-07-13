@@ -72,7 +72,7 @@ wifikit --setup                         # install missing external tools via bre
 
 ## The TUI
 
-The default interface: a single-screen dashboard with four tabs.
+The default interface: a single-screen dashboard with five tabs.
 
 | Tab          | What it shows                                                |
 | :----------- | :---------------------------------------------------------- |
@@ -80,6 +80,7 @@ The default interface: a single-screen dashboard with four tabs.
 | **Stations** | Clients grouped by AP (`list -c`) — select one to deauth.   |
 | **Console**  | Raw Marauder output + an input box to send any command.     |
 | **Crack**    | Runs `hashcat`/`aircrack-ng` on your machine, streamed live.|
+| **Settings** | Persisted preferences (`~/.config/wifikit/config.json`).    |
 
 Both tables **auto-populate live during a scan** — wifikit polls `list -a` and
 `list -c` on a timer, so rows appear without a keypress (and refresh once more
@@ -94,8 +95,9 @@ when the scan stops).
 | `r`      | Refresh the target and station lists.                      |
 | `a` / ↵  | Open the Actions menu for the highlighted target.          |
 | `d`      | Deauth the highlighted AP.                                 |
-| `p`      | Capture PMKID from the highlighted AP.                     |
-| `c`      | Capture (alias of `p` — PMKID).                            |
+| `c`      | Capture from the highlighted AP (handshake + PMKID).       |
+| `y`      | Copy the current context to the clipboard (AP/MAC/command).|
+| `1`–`5`  | Jump to a tab (Targets/Stations/Console/Crack/Settings).   |
 | `Ctrl+R` | Reconnect the serial session.                              |
 | `q`      | Quit.                                                       |
 
@@ -108,14 +110,45 @@ The Actions menu offers:
 
 - **Select as target** — `select -a <idx>`.
 - **Deauth (force disconnect)**.
-- **Capture PMKID → Mac (.pcap)**.
-- **Capture handshake → Mac (.pcap)**.
+- **Capture (stream handshake/PMKID to Mac)** — one action, not two.
+  Marauder's `sniffpmkid -serial` records PMKID *and* 4-way-handshake
+  EAPOL frames into the same pcap, and `hcxpcapngtool` extracts
+  whichever is present — so there's nothing for you to choose.
 - **Set radio to this channel**.
 - **Stop all activity**.
 
 Capturing is **SD-free**: the pcap streams over USB straight into `./captures`,
 then the **Crack** tab is pre-filled with a ready hashcat command. See
 [capture-to-crack.md](capture-to-crack.md) for the full loop.
+
+### Settings tab
+
+The **Settings** tab holds your preferences and persists them to
+`~/.config/wifikit/config.json`. Changes save as you make them —
+switches and the theme apply immediately; text and number fields commit
+when you press **Enter** in the field:
+
+| Setting | What it controls |
+| :-- | :-- |
+| **Capture duration (seconds)** | How long each capture streams. |
+| **Auto-deauth before capture** | When on, Capture fires a deauth burst first to force a handshake, then sniffs — one coordinated action. Ineffective against PMF/802.11w networks. |
+| **Deauth burst (seconds)** | Length of that pre-capture deauth burst. |
+| **Default wordlist** | Wordlist for the pre-filled crack command; blank auto-picks rockyou / the bundled example. |
+| **Auto-convert to hc22000** | When on, an EAPOL capture is converted to `.hc22000` automatically. |
+| **Capture output folder** | Where reassembled pcaps are written (default `./captures`). |
+| **Serial port** | Pin a device; blank auto-detects by USB-UART chip. |
+| **Theme** | Textual colour theme. |
+
+### Cracking after a capture
+
+When a capture contains EAPOL frames, wifikit auto-converts it to
+`.hc22000` (when `hcxtools` is installed and **Auto-convert** is on) and
+**pre-fills a ready `hashcat -m 22000 …` command in the Crack tab's
+input box**. To actually run the crack, switch to the **Crack** tab and
+**press Enter in that box** — hashcat's output then streams live in the
+tab below. (Without `hcxtools` it pre-fills the `hcxpcapngtool`
+conversion command instead, so you can convert once the tool is on
+`PATH`.)
 
 ## The REPL (`--cli`)
 
@@ -169,10 +202,11 @@ AP. Full loop: [capture-to-crack.md](capture-to-crack.md).
    `x` to stop.
 4. **Pick an AP** — highlight its row, press **Enter** → **Deauth** briefly to
    force a client to reconnect.
-5. **Capture** — **Enter** → **Capture PMKID/handshake** (or `p`); the pcap
-   lands in `./captures` and the Crack tab is pre-filled.
-6. **Crack** — in the Crack tab, run e.g.
-   `hashcat -m 22000 capture.hc22000 wordlist.txt`; output streams live.
+5. **Capture** — **Enter** → **Capture** (or `c`); the single capture grabs
+   both handshake and PMKID, the pcap lands in `./captures`, and the Crack
+   tab is pre-filled with a ready command.
+6. **Crack** — switch to the Crack tab and **press Enter** in the pre-filled
+   `hashcat -m 22000 …` box; output streams live.
 
 Something not working? See [troubleshooting.md](troubleshooting.md).
 
