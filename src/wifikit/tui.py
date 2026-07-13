@@ -40,42 +40,48 @@ from pathlib import Path
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import (
     DataTable,
     Footer,
     Header,
     Input,
+    Label,
     OptionList,
     RichLog,
+    Select,
     Static,
+    Switch,
     TabbedContent,
     TabPane,
 )
 from textual.widgets.option_list import Option
 
 from .capture import (
-    CAPTURE_MODES,
+    SNIFF_COMMAND,
     SavePcapStreamParser,
     convert_hc22000,
     looks_like_pcap,
     pcap_frame_stats,
 )
+from .config import CONFIG_PATH, Config, load_config, save_config
 from .marauder import Station, Target, parse_list_line, parse_station_lines
 from .session import Esp32Session, find_port
 
-
-def default_wordlist() -> str:
-    """
-    Pick the wordlist for the prefilled crack command.
-
-    Prefers the real ``wordlists/rockyou.txt`` if it has been downloaded (see
-    ``wordlists/README.md``), otherwise falls back to the small committed
-    ``wordlists/example-passwords.txt`` so the command is always runnable.
-    """
-    real = Path("wordlists/rockyou.txt")
-    return str(real) if real.exists() else "wordlists/example-passwords.txt"
+# The Settings tab fields, as (config attribute, widget id, label, kind). ``kind``
+# is "int" | "str" | "bool" | "theme" and drives which widget is rendered and how
+# its value is coerced back into the Config.
+SETTINGS_FIELDS = [
+    ("capture_seconds", "set_capture_seconds", "Capture duration (seconds)", "int"),
+    ("auto_deauth", "set_auto_deauth", "Auto-deauth before capture", "bool"),
+    ("deauth_seconds", "set_deauth_seconds", "Deauth burst (seconds)", "int"),
+    ("wordlist", "set_wordlist", "Default wordlist (blank = auto)", "str"),
+    ("auto_convert", "set_auto_convert", "Auto-convert to hc22000", "bool"),
+    ("captures_dir", "set_captures_dir", "Capture output folder", "str"),
+    ("port", "set_port", "Serial port (blank = auto-detect)", "str"),
+    ("theme", "set_theme", "Theme", "theme"),
+]
 
 
 class ActionsScreen(ModalScreen[str]):
@@ -105,8 +111,7 @@ class ActionsScreen(ModalScreen[str]):
             yield OptionList(
                 Option("Select as target", id="select"),
                 Option("Deauth (force disconnect)", id="deauth"),
-                Option("Capture PMKID → Mac (.pcap)", id="cap_pmkid"),
-                Option("Capture handshake → Mac (.pcap)", id="cap_handshake"),
+                Option("Capture (stream handshake/PMKID to Mac)", id="capture"),
                 Option("Set radio to this channel", id="channel"),
                 Option("Stop all activity", id="stop"),
                 id="actions_list",
@@ -132,19 +137,19 @@ class WifikitApp(App):
     # 115200-baud serial link.
     SCAN_REFRESH_SECS = 3.0
 
-    # Default duration (seconds) of an in-TUI ``-serial`` capture before we stop
-    # and assemble the pcap. Long enough to catch a PMKID / forced handshake.
-    CAPTURE_SECS = 20.0
-
     CSS = """
     #status { dock: top; height: 1; background: $panel; color: $text; padding: 0 1; }
     #ap_table { height: 1fr; }
     #sta_table { height: 1fr; }
     RichLog { height: 1fr; border: round $primary; }
-    #actions_box { width: 52; height: auto; border: thick $primary;
+    #actions_box { width: 56; height: auto; border: round $primary;
                    background: $surface; padding: 1; margin: 2 4; }
     #actions_title { text-style: bold; padding: 0 0 1 0; }
     #actions_list { height: auto; }
+    #settings_box { padding: 1 2; }
+    #settings_box Label { margin: 1 0 0 0; color: $text-muted; }
+    #settings_box Input { dock: initial; width: 48; }
+    #settings_box Select { width: 48; }
     Input { dock: bottom; }
     """
 
@@ -154,15 +159,25 @@ class WifikitApp(App):
         Binding("r", "refresh", "Refresh"),
         Binding("a", "actions", "Actions"),
         Binding("d", "deauth", "Deauth"),
-        Binding("p", "pmkid", "Capture PMKID"),
         Binding("c", "capture", "Capture"),
+        Binding("y", "yank", "Copy"),
         Binding("ctrl+r", "reconnect", "Reconnect"),
         Binding("q", "quit", "Quit"),
+        # Jump straight to a tab by number (1-5); hidden from the footer.
+        Binding("1", "show_tab('targets')", "Targets", show=False),
+        Binding("2", "show_tab('stations')", "Stations", show=False),
+        Binding("3", "show_tab('console')", "Console", show=False),
+        Binding("4", "show_tab('crack')", "Crack", show=False),
+        Binding("5", "show_tab('settings')", "Settings", show=False),
     ]
 
     def __init__(self, port: str | None = None, demo: bool = False) -> None:
         super().__init__()
-        self._port_arg = port
+        # Persistent user settings (capture length, auto-deauth, wordlist, theme…)
+        # edited from the Settings tab; the config file is created on first save.
+        self.config: Config = load_config()
+        # Explicit --port wins over the configured port, which wins over auto.
+        self._port_arg = port or (self.config.port or None)
         # Demo mode seeds the tables with fake targets/stations and never opens a
         # serial port — for screenshots/GIFs and for trying the UI with no board.
         self.demo = demo
@@ -206,10 +221,38 @@ class WifikitApp(App):
             with TabPane("Crack", id="crack"):
                 yield RichLog(id="crack_log", markup=False, wrap=True, auto_scroll=True)
                 yield Input(
-                    placeholder="Mac shell, e.g. hashcat -m 22000 cap.hc22000 "
-                    "wordlist.txt   (runs on your machine)",
+                    placeholder="hashcat/aircrack-ng command — press Enter to run "
+                    "it on your machine (auto-filled after a capture)",
                     id="crack_input",
                 )
+            with TabPane("Settings", id="settings"):
+                with VerticalScroll(id="settings_box"):
+                    yield Static(
+                        f" Settings — saved to {CONFIG_PATH} ",
+                        id="settings_title",
+                        markup=False,
+                    )
+                    for _attr, wid, label, kind in SETTINGS_FIELDS:
+                        yield Label(label)
+                        if kind == "bool":
+                            yield Switch(id=wid)
+                        elif kind == "theme":
+                            current = (
+                                self.config.theme
+                                if self.config.theme in self.available_themes
+                                else "textual-dark"
+                            )
+                            yield Select(
+                                [(n, n) for n in sorted(self.available_themes)],
+                                id=wid,
+                                value=current,
+                                allow_blank=False,
+                            )
+                        else:
+                            yield Input(
+                                id=wid,
+                                type="integer" if kind == "int" else "text",
+                            )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -221,15 +264,54 @@ class WifikitApp(App):
         # moves focus to the tab bar when you want to switch tabs.
         table.focus()
         self.query_one("#crack_log", RichLog).write(
-            "Crack tab: type a hashcat/aircrack-ng command; it runs on your "
-            "machine and streams here. Capture files land in ./captures (via the "
-            "Capture action — streamed over USB, no SD card needed)."
+            "Crack tab: a hashcat command is auto-filled here after a capture — "
+            "just press Enter in the box below to run it (or type your own). It "
+            "runs on your machine and streams here. Captures land in "
+            f"./{self.config.captures_dir} (streamed over USB, no SD card)."
         )
+        self._apply_theme()
+        self._load_settings_form()
         if self.demo:
             self._seed_demo()
             return
         self.set_interval(0.05, self._drain_serial)
         self.connect()
+
+    # ---- settings ----------------------------------------------------------
+
+    def _apply_theme(self) -> None:
+        """Apply the configured theme, ignoring an unknown/removed theme name."""
+        if self.config.theme in self.available_themes:
+            self.theme = self.config.theme
+
+    def _load_settings_form(self) -> None:
+        """Populate the Settings tab widgets from the current config."""
+        for attr, wid, _label, kind in SETTINGS_FIELDS:
+            if kind == "theme":
+                continue  # the Select is built with its options/value in compose
+            value = getattr(self.config, attr)
+            widget = self.query_one(f"#{wid}")
+            if kind == "bool":
+                widget.value = bool(value)
+            else:
+                widget.value = str(value)
+
+    def _save_setting(self, attr: str, value: object) -> None:
+        """Update one config field, persist, and re-notify the user."""
+        setattr(self.config, attr, value)
+        save_config(self.config)
+        self.notify(f"Saved: {attr} = {value}", timeout=3)
+
+    def on_switch_changed(self, event: Switch.Changed) -> None:
+        for attr, wid, _label, kind in SETTINGS_FIELDS:
+            if kind == "bool" and event.switch.id == wid:
+                self._save_setting(attr, event.value)
+                return
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == "set_theme" and event.value != Select.BLANK:
+            self.theme = str(event.value)
+            self._save_setting("theme", str(event.value))
 
     def _seed_demo(self) -> None:
         """Populate the tables with sample data for screenshots / no-board demos."""
@@ -251,6 +333,16 @@ class WifikitApp(App):
         self._log("[demo] seeded sample data — no board connected")
         self._log(">>> scanall")
         self._log("Scanning for APs and Stations. Stop with stopscan")
+        # Show a realistic post-capture state in the Crack tab (for demos/GIFs).
+        crack = self.query_one("#crack_log", RichLog)
+        crack.write(
+            "[capture] wrote captures/capture.pcap "
+            "(73075 bytes, 302 frames, EAPOL: 2, valid pcap)."
+        )
+        crack.write("[capture] hc22000 ready (2 EAPOL) - press Enter below to crack:")
+        self.query_one(
+            "#crack_input", Input
+        ).value = "hashcat -m 22000 captures/capture.hc22000 wordlists/rockyou.txt"
         self._update_status()
 
     # ---- serial plumbing ---------------------------------------------------
@@ -418,16 +510,48 @@ class WifikitApp(App):
     def action_reconnect(self) -> None:
         self.connect()
 
+    def action_show_tab(self, tab: str) -> None:
+        """Jump straight to a tab by id (number-key shortcut 1-5)."""
+        self.query_one(TabbedContent).active = tab
+
+    def action_yank(self) -> None:
+        """
+        Copy the current context to the system clipboard (vim-style ``y``).
+
+        What gets copied depends on the active tab: the highlighted AP's
+        name/channel/RSSI (Targets), the station MAC (Stations), the pre-filled
+        hashcat command (Crack), the console command (Console), or the focused
+        setting / config path (Settings). Uses the terminal clipboard (OSC 52).
+        """
+        tab = self.query_one(TabbedContent).active
+        text, what = "", "text"
+        if tab == "targets" and (t := self.current_target()):
+            text, what = f"{t.name} CH:{t.ch} {t.rssi}dBm", "target"
+        elif tab == "stations" and (s := self.current_station()):
+            text, what = s.mac, "station MAC"
+        elif tab == "crack":
+            text, what = self.query_one("#crack_input", Input).value, "crack command"
+        elif tab == "console":
+            text, what = self.query_one("#cmd_input", Input).value, "command"
+        elif tab == "settings":
+            focused = self.focused
+            if isinstance(focused, Input) and focused.value:
+                text, what = focused.value, "setting"
+            else:
+                text, what = str(CONFIG_PATH), "config path"
+        if not text:
+            self.notify("Nothing to copy on this tab")
+            return
+        self.copy_to_clipboard(text)
+        preview = text if len(text) <= 48 else text[:45] + "…"
+        self.notify(f"Copied {what}: {preview}")
+
     def action_deauth(self) -> None:
         self._run_target_action("deauth")
 
-    def action_pmkid(self) -> None:
-        """Hotkey: SD-free PMKID capture of the highlighted AP."""
-        self._start_capture("pmkid")
-
     def action_capture(self) -> None:
-        """Hotkey: SD-free PMKID capture (alias of ``p``) of the current AP."""
-        self._start_capture("pmkid")
+        """Hotkey (``c``): SD-free capture of the highlighted AP."""
+        self._start_capture()
 
     def action_actions(self) -> None:
         """Open the Actions modal for the highlighted target."""
@@ -466,8 +590,8 @@ class WifikitApp(App):
         self.tx("attack -t deauth -c")
 
     def _on_action_chosen(self, action: str | None) -> None:
-        if action in ("cap_pmkid", "cap_handshake"):
-            self._start_capture("pmkid" if action == "cap_pmkid" else "handshake")
+        if action == "capture":
+            self._start_capture()
         elif action:
             self._run_target_action(action)
 
@@ -494,7 +618,7 @@ class WifikitApp(App):
 
     # ---- SD-free capture (Marauder -serial → host pcap) --------------------
 
-    def _start_capture(self, mode: str) -> None:
+    def _start_capture(self) -> None:
         """Kick off a streaming capture of the highlighted AP, if possible."""
         if self.capturing:
             self.notify("A capture is already running")
@@ -506,28 +630,29 @@ class WifikitApp(App):
         if not self.session:
             self.notify("Not connected — press Ctrl-R", severity="warning")
             return
-        # Make the capture visible: notify, and switch to the Crack tab where the
+        # Make the capture visible: notify + switch to the Crack tab where the
         # live progress and result are logged (otherwise it looks like nothing
-        # happened). A handshake also needs a client to (re)associate on this
-        # channel during the window — deauth first (d) on a non-PMF network.
+        # happened). Duration and auto-deauth come from Settings.
+        extra = " (auto-deauth first)" if self.config.auto_deauth else ""
         self.notify(
-            f"Capturing {mode} on {t.name} (ch {t.ch}) for "
-            f"{self.CAPTURE_SECS:.0f}s — watch the Crack tab."
+            f"Capturing {t.name} (ch {t.ch}) for "
+            f"{self.config.capture_seconds}s{extra} — watch the Crack tab."
         )
         self.query_one(TabbedContent).active = "crack"
-        self.run_worker(self._run_capture(t, mode), exclusive=False)
+        self.run_worker(self._run_capture(t), exclusive=False)
 
-    async def _run_capture(self, target: Target, mode: str) -> None:
+    async def _run_capture(self, target: Target) -> None:
         """
         Stream a pcap off the board via Marauder's ``-serial`` and save it.
 
-        Marauder emits the raw pcap bytes over the same USB UART, framed by
-        ``[BUF/BEGIN]``/``[BUF/CLOSE]``. We tap the session's *raw* byte stream
-        (``on_raw``) into a :class:`~wifikit.capture.SavePcapStreamParser`, run
-        the sniff on the target's channel for :data:`CAPTURE_SECS`, then assemble
-        and write the ``.pcap`` — no SD card involved. On success the Crack tab's
-        input is pre-filled with a ready hashcat command.
+        Taps the session's raw byte stream into a
+        :class:`~wifikit.capture.SavePcapStreamParser`; optionally fires a deauth
+        first (Settings → auto-deauth) to force a handshake; sniffs on the
+        target's channel for ``config.capture_seconds``; then assembles the
+        ``.pcap`` — no SD card. Auto-converts to ``hc22000`` and pre-fills the
+        Crack tab so cracking is one Enter press.
         """
+        cfg = self.config
         log = self.query_one("#crack_log", RichLog)
         parser = SavePcapStreamParser()
         # Stop the live list poll so it doesn't interleave `list` output with the
@@ -535,28 +660,38 @@ class WifikitApp(App):
         self._stop_scan_poll()
         self.capturing = True
         self._update_status()
-        # Route raw serial bytes into the pcap demuxer for the capture window.
         self.session.on_raw = parser.feed
         try:
-            log.write(
-                f"[capture] {mode} on '{target.name}' ch {target.ch} "
-                f"for {self.CAPTURE_SECS:.0f}s — needs SavePCAP + -serial firmware."
-            )
             self.tx("settings -s SavePCAP true", echo=False)
             await asyncio.sleep(0.5)
-            for tmpl in CAPTURE_MODES[mode]:
-                self.tx(tmpl.format(channel=target.ch), echo=False)
-                await asyncio.sleep(0.2)
-            # Sleep in chunks so we can show a live heartbeat — a long silent
-            # wait is exactly what reads as "nothing is happening".
+            if cfg.auto_deauth:
+                # Force a reassociation: deauth the AP's clients, then sniff the
+                # reconnect. (No effect against PMF/802.11w networks.)
+                log.write(
+                    f"[capture] auto-deauth {cfg.deauth_seconds}s on ch {target.ch}…"
+                )
+                self.tx(f"channel -s {target.ch}", echo=False)
+                self.tx(f"select -a {target.idx}", echo=False)
+                self.tx("attack -t deauth", echo=False)
+                await asyncio.sleep(cfg.deauth_seconds)
+                self.tx("stopscan", echo=False)
+                await asyncio.sleep(0.5)
+            log.write(
+                f"[capture] sniffing '{target.name}' ch {target.ch} for "
+                f"{cfg.capture_seconds}s — needs SavePCAP + -serial firmware."
+            )
+            self.tx(SNIFF_COMMAND.format(channel=target.ch), echo=False)
+            await asyncio.sleep(0.2)
+            # Sleep in chunks for a live heartbeat — a long silent wait is exactly
+            # what reads as "nothing is happening".
             elapsed = 0.0
-            while elapsed < self.CAPTURE_SECS:
-                await asyncio.sleep(min(5.0, self.CAPTURE_SECS - elapsed))
+            while elapsed < cfg.capture_seconds:
+                await asyncio.sleep(min(5.0, cfg.capture_seconds - elapsed))
                 elapsed += 5.0
                 frames, eapol = pcap_frame_stats(parser.pcap_bytes())
                 log.write(
-                    f"[capture] {min(elapsed, self.CAPTURE_SECS):.0f}/"
-                    f"{self.CAPTURE_SECS:.0f}s — {frames} frames, EAPOL {eapol}"
+                    f"[capture] {min(elapsed, cfg.capture_seconds):.0f}/"
+                    f"{cfg.capture_seconds}s — {frames} frames, EAPOL {eapol}"
                 )
             self.tx("stopscan", echo=False)
             await asyncio.sleep(0.5)
@@ -573,8 +708,9 @@ class WifikitApp(App):
             )
             self.notify("Capture produced no frames", severity="warning")
             return
-        Path("captures").mkdir(exist_ok=True)
-        out = Path("captures") / f"capture-{int(time.time())}.pcap"
+        outdir = Path(cfg.captures_dir)
+        outdir.mkdir(parents=True, exist_ok=True)
+        out = outdir / f"capture-{int(time.time())}.pcap"
         out.write_bytes(pcap)
         frames, eapol = pcap_frame_stats(pcap)
         valid = "valid" if looks_like_pcap(pcap) else "UNRECOGNISED"
@@ -585,36 +721,52 @@ class WifikitApp(App):
         crack_input = self.query_one("#crack_input", Input)
         convert_cmd = f"hcxpcapngtool -o {out.with_suffix('.hc22000')} {out}"
         if eapol == 0:
-            # Beacons/mgmt only — nothing crackable. A PMKID/handshake needs a
-            # client (re)association; suggest a brief authorised deauth.
             log.write(
-                "[capture] no EAPOL captured — nothing crackable yet. Deauth the "
-                "AP briefly (Actions → Deauth) to force a client to reconnect."
+                "[capture] no EAPOL captured — nothing crackable yet. Turn on "
+                "auto-deauth in Settings (or press d) to force a reconnect; note "
+                "PMF/802.11w networks resist this."
             )
             crack_input.value = convert_cmd
+        elif cfg.auto_convert and (hc := convert_hc22000(str(out))):
+            log.write(
+                f"[capture] hc22000 ready ({eapol} EAPOL) — ▶ press Enter below "
+                "to crack it:"
+            )
+            crack_input.value = f"hashcat -m 22000 {hc} {cfg.resolved_wordlist()}"
         else:
-            hc = convert_hc22000(str(out))
-            if hc:
-                log.write(f"[capture] hc22000 ready ({eapol} EAPOL): {hc}")
-                crack_input.value = f"hashcat -m 22000 {hc} {default_wordlist()}"
-            else:
-                log.write(
-                    "[capture] EAPOL captured — install hcxtools "
-                    "(brew install hcxtools) to build the hc22000."
-                )
-                crack_input.value = convert_cmd
+            log.write(
+                "[capture] EAPOL captured — install hcxtools (brew install "
+                "hcxtools), then press Enter below to convert:"
+            )
+            crack_input.value = convert_cmd
+        self.query_one(TabbedContent).active = "crack"
         crack_input.focus()
 
     # ---- inputs ------------------------------------------------------------
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        wid = event.input.id
+        # Settings fields persist on Enter and keep their value on screen.
+        for attr, sid, _label, kind in SETTINGS_FIELDS:
+            if wid == sid and kind in ("int", "str"):
+                raw = event.value.strip()
+                if kind == "int":
+                    try:
+                        self._save_setting(attr, int(raw))
+                    except ValueError:
+                        self.notify(
+                            f"{attr} must be a whole number", severity="warning"
+                        )
+                else:
+                    self._save_setting(attr, raw)
+                return
         value = event.value.strip()
         event.input.value = ""
         if not value:
             return
-        if event.input.id == "cmd_input":
+        if wid == "cmd_input":
             self.tx(value)
-        elif event.input.id == "crack_input":
+        elif wid == "crack_input":
             self.run_worker(self._run_crack(value), exclusive=False)
 
     async def _run_crack(self, cmd: str) -> None:

@@ -66,15 +66,16 @@ PCAP_MAGICS = (
 # console banner, which prints "PMKID"/"EAPOL" regardless of what was captured.
 EAPOL_LLC_SNAP = b"\xaa\xaa\x03\x00\x00\x00\x88\x8e"
 
-# Marauder sniff commands per capture mode; ``-serial`` makes them stream pcap.
-# Both modes use ``sniffpmkid`` — despite the name it captures the EAPOL frames
-# of a full 4-way handshake as well as clientless PMKIDs, and ``hcxpcapngtool``
-# extracts whichever is present. (``sniffpwn`` is a Pwnagotchi beacon sniffer,
-# NOT a handshake capturer — do not use it here.)
-CAPTURE_MODES = {
-    "pmkid": ["sniffpmkid -c {channel} -serial"],
-    "handshake": ["sniffpmkid -c {channel} -serial"],
-}
+# The one Marauder command wifikit uses to capture crackable frames. Despite the
+# name, ``sniffpmkid`` captures both clientless PMKIDs and the EAPOL frames of a
+# full 4-way handshake; ``hcxpcapngtool`` extracts whichever is present. So there
+# is a single capture command, not a PMKID-vs-handshake choice. ``-serial`` makes
+# it stream the pcap over USB. (``sniffpwn`` is a Pwnagotchi beacon sniffer, NOT
+# a handshake capturer — do not use it here.)
+SNIFF_COMMAND = "sniffpmkid -c {channel} -serial"
+
+# Kept for the CLI's ``--mode`` flag (both map to the same command now).
+CAPTURE_MODES = {"pmkid": [SNIFF_COMMAND], "handshake": [SNIFF_COMMAND]}
 
 
 def looks_like_pcap(data: bytes) -> bool:
