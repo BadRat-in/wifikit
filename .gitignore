@@ -25,6 +25,11 @@ env/
 *.hc22000
 .wifikit_history
 
+# Internal session working docs — kept local, not part of the published repo.
+# Public documentation lives in docs/.
+/HANDOFF.md
+/CAPTURE_STREAMING.md
+
 # OS / editor
 .DS_Store
 *.swp
